@@ -1,5 +1,6 @@
 const mongodb = require('mongodb');
 const getDb = require('../util/database').getDb;
+const ObjectId = mongodb.ObjectId;
 
 class User {
   constructor(name, email, cart, id) {
@@ -21,7 +22,7 @@ class User {
     }
     else {
       updatedCartItems.push({
-        productId: new mongodb.ObjectId(product._id),
+        productId: new ObjectId(product._id),
         quantity: newQty
       })
     }
@@ -31,7 +32,7 @@ class User {
     // const updatedCart = { items: [{ productId: product._id, quantity: 1 }] };
     const db = getDb();
     return db.collection('users').updateOne(
-      { _id: new mongodb.ObjectId(this._id) },
+      { _id: new ObjectId(this._id) },
       { $set: { cart: updatedCart } }
     )
   }
@@ -66,10 +67,50 @@ class User {
     })
     return db.collection('users')
       .updateOne(
-        { _id: new mongodb.ObjectId(this._id) },
+        { _id: new ObjectId(this._id) },
         { $set: { cart: { items: updatedCartItems } } })
       .then(result => {
         console.log(result);
+      })
+      .catch(err => {
+        console.log(err);
+      })
+  }
+
+  addToOrder() {
+    const db = getDb();
+    return this.getCart()
+      .then(products => {
+        const order = {
+          items: products,
+          user: {
+            _id: new ObjectId(this._id),
+            name: this.name
+          }
+        }
+        Promise.all([
+          db.collection('orders').insertOne(order),
+          db.collection('users').updateOne(
+            { _id: new ObjectId(this._id) },
+            { $set: { cart: { items: [] } } }
+          )
+        ])
+      })
+      .then(result => {
+        console.log(result);
+      })
+      .catch(err => {
+        console.log(err);
+      })
+  }
+
+  getOrder() {
+    const db = getDb();
+    return db.collection('orders')
+      .find({ 'user._id': new ObjectId(this._id) })
+      .toArray()
+      .then(orders => {
+        return orders;
       })
       .catch(err => {
         console.log(err);
@@ -90,7 +131,7 @@ class User {
   static findById(userId) {
     const db = getDb();
     return db.collection('users')
-      .findOne({ _id: new mongodb.ObjectId(userId) })
+      .findOne({ _id: new ObjectId(userId) })
       .then(user => {
         console.log(user);
         return user;
